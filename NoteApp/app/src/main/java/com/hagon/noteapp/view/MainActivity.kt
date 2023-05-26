@@ -15,6 +15,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.hagon.noteapp.R
 import com.hagon.noteapp.adapter.NoteAdapter
+import com.hagon.noteapp.database.NoteDatabase
+import com.hagon.noteapp.database.NoteRepository
 import com.hagon.noteapp.databinding.ActivityMainBinding
 import com.hagon.noteapp.model.Note
 import com.hagon.noteapp.viewmodel.NoteViewModel
@@ -26,7 +28,6 @@ class MainActivity : AppCompatActivity(), NoteAdapter.OnClicked {
     private lateinit var viewModel: NoteViewModel
     private lateinit var adapter: NoteAdapter
     private var list = listOf<Note>()
-    private lateinit var factory: NoteViewModelFactory
     private lateinit var getContent: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,15 +39,15 @@ class MainActivity : AppCompatActivity(), NoteAdapter.OnClicked {
     }
 
     private fun initView() {
-        factory = NoteViewModelFactory(this)
+        val repository = NoteRepository(NoteDatabase.getDatabase(this).noteDao())
+        val factory = NoteViewModelFactory(repository)
         binding.recycleView.layoutManager =
             StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
         viewModel = ViewModelProvider(this, factory)[NoteViewModel::class.java]
         adapter = NoteAdapter(list, this)
         binding.recycleView.adapter = adapter
 
-        val data = viewModel.getAll()
-        data.observe(this) {
+        viewModel.list.observe(this) {
             val text = binding.searchView.query.toString()
             list = if (text != "") {
                 viewModel.search(text)
@@ -71,11 +72,11 @@ class MainActivity : AppCompatActivity(), NoteAdapter.OnClicked {
                     when (id) {
                         -2 -> Toast.makeText(this, "Can't get data", Toast.LENGTH_SHORT).show()
                         -1 -> {
-                            viewModel.insert(Note(null, title, note, date))
+                            viewModel.repository.insert(Note(null, title, note, date))
                             Toast.makeText(this, "Inserted", Toast.LENGTH_SHORT).show()
                         }
                         else -> {
-                            viewModel.update(Note(id, title, note, date))
+                            viewModel.repository.update(Note(id, title, note, date))
                             Toast.makeText(this, "Updated $title", Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -140,7 +141,7 @@ class MainActivity : AppCompatActivity(), NoteAdapter.OnClicked {
             setTitle("Warring!!!")
             setMessage("Do you want to delete ${note.title}")
             setPositiveButton("Yes") { dialog, _ ->
-                viewModel.delete(note)
+                viewModel.repository.delete(note)
                 dialog.dismiss()
             }
             setNegativeButton("No") { dialog, _ ->
